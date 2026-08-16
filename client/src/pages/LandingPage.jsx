@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Compass, Sparkles, Languages, CheckCircle, ArrowRight, Play, Star, Plus } from 'lucide-react';
+import { Compass, Sparkles, Languages, CheckCircle, ArrowRight, Play, Star, Plus, Film } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const LandingPage = () => {
