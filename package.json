@@ -8,9 +8,9 @@
     "server": "nodemon server/server.js",
     "client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "install-server": "npm install --prefix server",
-    "install-client": "npm install --prefix client",
-    "install-all": "npm install && npm run install-server && npm run install-client",
+    "install-server": "npm install --production=false --prefix server",
+    "install-client": "npm install --production=false --prefix client",
+    "install-all": "npm install --production=false && npm run install-server && npm run install-client",
     "build": "npm run install-all && npm run build --prefix client"
   },
   "devDependencies": {
