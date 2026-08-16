@@ -6,7 +6,6 @@ const MovieCarousel = ({
   movies = [],
   watchlistIds = [],
   onWatchlistToggle = null,
-  onPlayTrailer = null
 }) => {
   const carouselRef = useRef(null);
 
@@ -51,7 +50,6 @@ const MovieCarousel = ({
               movie={movie}
               inWatchlist={watchlistIds.includes(movie.id)}
               onWatchlistToggle={onWatchlistToggle}
-              onPlayTrailer={onPlayTrailer}
             />
           </div>
         ))}

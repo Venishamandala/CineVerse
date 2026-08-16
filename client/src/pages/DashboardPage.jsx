@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import MovieCarousel from '../components/MovieCarousel';
-import TrailerModal from '../components/TrailerModal';
 import { MovieCardSkeleton } from '../components/LoadingSkeleton';
-import { Film, Sparkles, TrendingUp, Calendar, Trophy, Bookmark, Star } from 'lucide-react';
+import { Sparkles, TrendingUp, Calendar, Trophy, Bookmark, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const DashboardPage = () => {
@@ -19,10 +18,7 @@ const DashboardPage = () => {
   const [watchlistIds, setWatchlistIds] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Trailer modal states
-  const [trailerOpen, setTrailerOpen] = useState(false);
-  const [trailerKey, setTrailerKey] = useState(null);
-  const [trailerTitle, setTrailerTitle] = useState('');
+
 
   // Fetch all collections in parallel
   const fetchData = async () => {
@@ -79,24 +75,7 @@ const DashboardPage = () => {
     }
   };
 
-  const handlePlayTrailer = async (movieId, title) => {
-    try {
-      const res = await api.get(`/movies/${movieId}/videos`);
-      if (res.data.success && res.data.data.results.length > 0) {
-        const trailer = res.data.data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube') || res.data.data.results[0];
-        setTrailerKey(trailer.key);
-      } else {
-        setTrailerKey(null);
-      }
-      setTrailerTitle(title);
-      setTrailerOpen(true);
-    } catch (err) {
-      console.error('Trailer lookup failed:', err.message);
-      setTrailerTitle(title);
-      setTrailerKey(null);
-      setTrailerOpen(true);
-    }
-  };
+
 
   // Select a random movie from trending to display as featured banner
   const featuredMovie = trending[0];
@@ -130,12 +109,6 @@ const DashboardPage = () => {
             </p>
             
             <div className="flex space-x-3 pt-2">
-              <button
-                onClick={() => handlePlayTrailer(featuredMovie.id, featuredMovie.title)}
-                className="px-5 py-2.5 bg-brand text-white text-xs font-bold rounded-full hover:bg-brand-hover flex items-center shadow-glow"
-              >
-                <Film className="w-3.5 h-3.5 mr-2 fill-current" /> Play Trailer
-              </button>
               <button
                 onClick={() => handleWatchlistToggle(featuredMovie)}
                 className="px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-bold rounded-full flex items-center"
@@ -178,7 +151,6 @@ const DashboardPage = () => {
                       movies={[{ id: item.movieId, title: item.movieTitle, poster_path: item.posterPath }]}
                       watchlistIds={watchlistIds}
                       onWatchlistToggle={handleWatchlistToggle}
-                      onPlayTrailer={handlePlayTrailer}
                     />
                   </div>
                 ))}
@@ -196,7 +168,6 @@ const DashboardPage = () => {
                 movies={recommendations}
                 watchlistIds={watchlistIds}
                 onWatchlistToggle={handleWatchlistToggle}
-                onPlayTrailer={handlePlayTrailer}
               />
             </div>
           )}
@@ -210,7 +181,6 @@ const DashboardPage = () => {
               movies={trending}
               watchlistIds={watchlistIds}
               onWatchlistToggle={handleWatchlistToggle}
-              onPlayTrailer={handlePlayTrailer}
             />
           </div>
 
@@ -223,7 +193,6 @@ const DashboardPage = () => {
               movies={popular}
               watchlistIds={watchlistIds}
               onWatchlistToggle={handleWatchlistToggle}
-              onPlayTrailer={handlePlayTrailer}
             />
           </div>
 
@@ -236,7 +205,6 @@ const DashboardPage = () => {
               movies={topRated}
               watchlistIds={watchlistIds}
               onWatchlistToggle={handleWatchlistToggle}
-              onPlayTrailer={handlePlayTrailer}
             />
           </div>
 
@@ -249,20 +217,13 @@ const DashboardPage = () => {
               movies={upcoming}
               watchlistIds={watchlistIds}
               onWatchlistToggle={handleWatchlistToggle}
-              onPlayTrailer={handlePlayTrailer}
             />
           </div>
 
         </div>
       )}
 
-      {/* Trailer Modal Player */}
-      <TrailerModal
-        isOpen={trailerOpen}
-        onClose={() => setTrailerOpen(false)}
-        youtubeKey={trailerKey}
-        movieTitle={trailerTitle}
-      />
+
 
     </div>
   );

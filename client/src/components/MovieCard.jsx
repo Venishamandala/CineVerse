@@ -7,7 +7,6 @@ const MovieCard = ({
   movie,
   inWatchlist = false,
   onWatchlistToggle = null,
-  onPlayTrailer = null,
 }) => {
   const imageUrl = movie.poster_path
     ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
@@ -27,14 +26,6 @@ const MovieCard = ({
     e.stopPropagation();
     if (onWatchlistToggle) {
       onWatchlistToggle(movie);
-    }
-  };
-
-  const handleTrailerClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onPlayTrailer) {
-      onPlayTrailer(movie.id, movie.title);
     }
   };
 
@@ -94,18 +85,9 @@ const MovieCard = ({
         
         {/* Play Overlay */}
         <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 opacity-0 bg-slate-950/60 group-hover:opacity-100">
-          <div className="flex space-x-2">
-            <button
-              onClick={handleTrailerClick}
-              className="p-3 transition-transform duration-200 transform scale-75 rounded-full bg-brand text-white hover:scale-100 hover:bg-brand-hover shadow-glow"
-              title="Play Trailer"
-            >
-              <Play className="w-5 h-5 fill-current" />
-            </button>
-            <span className="px-3.5 py-2.5 text-xs font-bold bg-white text-slate-950 rounded-full hover:bg-slate-200">
-              View Details
-            </span>
-          </div>
+          <span className="px-4 py-2 text-xs font-bold bg-white text-slate-950 rounded-full shadow-md group-hover:scale-105 transition-transform duration-200">
+            View Details
+          </span>
         </div>
       </Link>
 

@@ -61,12 +61,40 @@ const getMoodRecommendations = async (req, res, next) => {
       sortBy = 'vote_average.desc'; // Solo viewers prefer high-rated, deep plots
     }
 
+    // Fetch page 1 initially to gather metadata (like total_pages)
     const data = await tmdbService.discoverMovies({
       genreId: genreString,
       sortBy,
-      language: language, // Pass original language code (en, hi, ko, ja, es, etc.)
+      language: language,
       page: 1
     });
+
+    let results = data.results || [];
+
+    // If there is more than 1 page, randomly fetch from other pages to inject diversity
+    if (data.total_pages > 1 && results.length > 0) {
+      const maxPagesToScan = Math.min(data.total_pages, 8); // Scan up to page 8 for diversity
+      const randomPage = Math.floor(Math.random() * maxPagesToScan) + 1;
+      
+      if (randomPage > 1) {
+        try {
+          const freshData = await tmdbService.discoverMovies({
+            genreId: genreString,
+            sortBy,
+            language: language,
+            page: randomPage
+          });
+          if (freshData.results && freshData.results.length > 0) {
+            results = freshData.results;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch random discover page ${randomPage}:`, err.message);
+        }
+      }
+    }
+
+    // Shuffle the results array using Fisher-Yates or simple sort to avoid repeating orders
+    results = results.sort(() => Math.random() - 0.5);
 
     const moodLabels = { 
       happy: 'cheerful & uplifting', 
@@ -101,7 +129,7 @@ const getMoodRecommendations = async (req, res, next) => {
     res.json({
       success: true,
       message: aiMessage,
-      data: (data.results || []).slice(0, 8) // Limit to top 8 items for clean layout grid
+      data: results.slice(0, 8) // Limit to top 8 items for clean layout grid
     });
   } catch (error) {
     next(error);

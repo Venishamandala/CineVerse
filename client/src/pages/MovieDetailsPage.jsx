@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import RatingStars from '../components/RatingStars';
-import TrailerModal from '../components/TrailerModal';
 import MovieCarousel from '../components/MovieCarousel';
 import { MovieDetailsSkeleton } from '../components/LoadingSkeleton';
-import { Play, Bookmark, BookmarkCheck, Star, Calendar, Clock, Globe, ArrowLeft, Heart, Film } from 'lucide-react';
+import { Play, Bookmark, BookmarkCheck, Star, Calendar, Clock, Globe, ArrowLeft, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const MovieDetailsPage = () => {
@@ -21,9 +20,7 @@ const MovieDetailsPage = () => {
   const [isWatched, setIsWatched] = useState(false);
   const [userRating, setUserRating] = useState(0);
 
-  // Trailer states
-  const [trailerOpen, setTrailerOpen] = useState(false);
-  const [trailerKey, setTrailerKey] = useState(null);
+
 
   // General watchlist check list for Similar movie child components
   const [watchlistIds, setWatchlistIds] = useState([]);
@@ -55,14 +52,7 @@ const MovieDetailsPage = () => {
         setWatchlistIds(watchlistRes.data.data.map(w => w.movieId));
       }
 
-      // Fetch trailers key
-      const videoRes = await api.get(`/movies/${movieId}/videos`);
-      if (videoRes.data.success && videoRes.data.data.results.length > 0) {
-        const trailer = videoRes.data.data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube') || videoRes.data.data.results[0];
-        setTrailerKey(trailer.key);
-      } else {
-        setTrailerKey(null);
-      }
+
     } catch (err) {
       console.error('Failed to load movie details page:', err.message);
     } finally {
@@ -261,12 +251,6 @@ const MovieDetailsPage = () => {
 
           {/* Action Row buttons */}
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => setTrailerOpen(true)}
-              className="px-6 py-3 bg-brand hover:bg-brand-hover text-white text-xs font-bold rounded-full flex items-center shadow-glow"
-            >
-              <Play className="w-4 h-4 mr-2 fill-current" /> Play Trailer
-            </button>
             
             <button
               onClick={handleWatchlistToggle}
@@ -436,13 +420,7 @@ const MovieDetailsPage = () => {
         </div>
       )}
 
-      {/* Trailer modal video iframe */}
-      <TrailerModal
-        isOpen={trailerOpen}
-        onClose={() => setTrailerOpen(false)}
-        youtubeKey={trailerKey}
-        movieTitle={movie.title}
-      />
+
 
     </div>
   );

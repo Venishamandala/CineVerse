@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Compass, Sparkles, Languages, CheckCircle, Film, ArrowRight, Play, Star, Plus } from 'lucide-react';
+import { Compass, Sparkles, Languages, CheckCircle, ArrowRight, Play, Star, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
-import TrailerModal from '../components/TrailerModal';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -12,10 +11,7 @@ const LandingPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Trailer modal states
-  const [trailerOpen, setTrailerOpen] = useState(false);
-  const [trailerKey, setTrailerKey] = useState(null);
-  const [trailerTitle, setTrailerTitle] = useState('');
+
 
   useEffect(() => {
     const fetchLandingMovies = async () => {
@@ -43,24 +39,7 @@ const LandingPage = () => {
     }
   };
 
-  const playTrailer = async (movieId, title) => {
-    try {
-      const res = await api.get(`/movies/${movieId}/videos`);
-      if (res.data.success && res.data.data.results.length > 0) {
-        const trailer = res.data.data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube') || res.data.data.results[0];
-        setTrailerKey(trailer.key);
-      } else {
-        setTrailerKey(null);
-      }
-      setTrailerTitle(title);
-      setTrailerOpen(true);
-    } catch (err) {
-      console.error('Failed to load trailer:', err.message);
-      setTrailerTitle(title);
-      setTrailerKey(null);
-      setTrailerOpen(true);
-    }
-  };
+
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -180,7 +159,7 @@ const LandingPage = () => {
             {trending.map((movie) => (
               <div
                 key={movie.id}
-                onClick={() => playTrailer(movie.id, movie.title)}
+                onClick={() => navigate('/login')}
                 className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-lg border dark:border-dark-border light:border-light-border group cursor-pointer"
               >
                 <img
@@ -197,7 +176,7 @@ const LandingPage = () => {
                     <span className="flex items-center"><Star className="w-3 h-3 text-amber-400 fill-current mr-0.5" />{movie.vote_average.toFixed(1)}</span>
                   </div>
                   <span className="mt-2 text-[9px] font-bold text-brand flex items-center">
-                    <Play className="w-2.5 h-2.5 fill-current mr-1" /> PLAY TRAILER
+                    VIEW DETAILS
                   </span>
                 </div>
               </div>
@@ -290,7 +269,7 @@ const LandingPage = () => {
             {popular.map((movie) => (
               <div
                 key={movie.id}
-                onClick={() => playTrailer(movie.id, movie.title)}
+                onClick={() => navigate('/login')}
                 className="relative aspect-[2/3] rounded-xl overflow-hidden shadow border dark:border-dark-border light:border-light-border cursor-pointer group"
               >
                 <img
@@ -301,7 +280,9 @@ const LandingPage = () => {
                 
                 {/* Overlay trigger */}
                 <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300">
-                  <Play className="w-7 h-7 text-white fill-current" />
+                  <span className="px-3 py-1.5 bg-white text-slate-950 rounded-full font-bold text-[10px]">
+                    VIEW DETAILS
+                  </span>
                 </div>
               </div>
             ))}
@@ -331,15 +312,6 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
-
-      {/* Embedded Trailer Player Modal */}
-      <TrailerModal
-        isOpen={trailerOpen}
-        onClose={() => setTrailerOpen(false)}
-        youtubeKey={trailerKey}
-        movieTitle={trailerTitle}
-      />
-      
     </div>
   );
 };

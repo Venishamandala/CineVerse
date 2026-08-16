@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import MovieCard from '../components/MovieCard';
-import TrailerModal from '../components/TrailerModal';
 import { MovieGridSkeleton } from '../components/LoadingSkeleton';
 import EmptyState from '../components/EmptyState';
 import { BrainCircuit, Sparkles, Send, Globe } from 'lucide-react';
@@ -18,10 +17,7 @@ const AISuggesterPage = () => {
   const [typingMessage, setTypingMessage] = useState('');
   const [watchlistIds, setWatchlistIds] = useState([]);
 
-  // Trailer states
-  const [trailerOpen, setTrailerOpen] = useState(false);
-  const [trailerKey, setTrailerKey] = useState(null);
-  const [trailerTitle, setTrailerTitle] = useState('');
+
 
   const languages = [
     { id: 'en', name: 'English', emoji: '🇺🇸' },
@@ -123,24 +119,7 @@ const AISuggesterPage = () => {
     }
   };
 
-  const handlePlayTrailer = async (movieId, title) => {
-    try {
-      const res = await api.get(`/movies/${movieId}/videos`);
-      if (res.data.success && res.data.data.results.length > 0) {
-        const trailer = res.data.data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube') || res.data.data.results[0];
-        setTrailerKey(trailer.key);
-      } else {
-        setTrailerKey(null);
-      }
-      setTrailerTitle(title);
-      setTrailerOpen(true);
-    } catch (err) {
-      console.error('Trailer lookup error:', err.message);
-      setTrailerTitle(title);
-      setTrailerKey(null);
-      setTrailerOpen(true);
-    }
-  };
+
 
   return (
     <div className="space-y-8">
@@ -278,7 +257,6 @@ const AISuggesterPage = () => {
                 movie={movie}
                 inWatchlist={watchlistIds.includes(movie.id)}
                 onWatchlistToggle={handleWatchlistToggle}
-                onPlayTrailer={handlePlayTrailer}
               />
             ))}
           </div>
@@ -295,13 +273,7 @@ const AISuggesterPage = () => {
         )}
       </div>
 
-      {/* Trailer Modal Player */}
-      <TrailerModal
-        isOpen={trailerOpen}
-        onClose={() => setTrailerOpen(false)}
-        youtubeKey={trailerKey}
-        movieTitle={trailerTitle}
-      />
+
 
     </div>
   );
