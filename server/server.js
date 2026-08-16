@@ -22,6 +22,9 @@ connectDB();
 
 const app = express();
 
+// Trust proxy for rate limiter behind reverse proxies like Render
+app.set('trust proxy', 1);
+
 // Body Parser
 app.use(express.json());
 
