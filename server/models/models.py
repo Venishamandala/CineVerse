@@ -2,14 +2,28 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Any
 from datetime import datetime
 
-# Helper to convert MongoDB document _id to a string field named "id" for API compatibility
+from bson import ObjectId
+
 def serialize_doc(doc: Any) -> Optional[dict]:
     if doc is None:
         return None
-    serialized = dict(doc)
-    if "_id" in serialized:
-        serialized["id"] = str(serialized["_id"])
+    
+    serialized = {}
+    for k, v in dict(doc).items():
+        if isinstance(v, ObjectId):
+            serialized[k] = str(v)
+        elif isinstance(v, list):
+            serialized[k] = [str(x) if isinstance(x, ObjectId) else x for x in v]
+        elif isinstance(v, dict):
+            serialized[k] = serialize_doc(v)
+        else:
+            serialized[k] = v
+            
+    if "id" not in serialized and "_id" in dict(doc):
+        # Already string-converted in the loop above
+        serialized["id"] = serialized["_id"]
         del serialized["_id"]
+        
     return serialized
 
 def serialize_docs(docs: List[Any]) -> List[dict]:
