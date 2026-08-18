@@ -44,7 +44,7 @@ async def register(data: UserRegister):
     return {
         "success": True,
         "token": token,
-        "data": serialize_doc(created_user)
+        "user": serialize_doc(created_user)
     }
 
 @router.post("/login")
@@ -72,14 +72,14 @@ async def login(data: UserLogin):
     return {
         "success": True,
         "token": token,
-        "data": serialize_doc(user)
+        "user": serialize_doc(user)
     }
 
 @router.get("/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return {
         "success": True,
-        "data": serialize_doc(current_user)
+        "user": serialize_doc(current_user)
     }
 
 @router.put("/onboarding")
@@ -117,5 +117,5 @@ async def onboarding(data: OnboardingUpdate, current_user: dict = Depends(get_cu
     return {
         "success": True,
         "message": "Preferences updated successfully",
-        "data": serialize_doc(updated_user)
+        "user": serialize_doc(updated_user)
     }
