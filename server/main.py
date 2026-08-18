@@ -20,6 +20,7 @@ from server.routes.movies import router as movies_router
 from server.routes.watchlist import router as watchlist_router
 from server.routes.ratings import router as ratings_router
 from server.routes.recommendations import router as recommendations_router
+from server.routes.users import router as users_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,6 +52,7 @@ app.include_router(movies_router, prefix="/api/movies", tags=["Movies"])
 app.include_router(watchlist_router, prefix="/api/watchlist", tags=["Watchlist"])
 app.include_router(ratings_router, prefix="/api/ratings", tags=["Ratings"])
 app.include_router(recommendations_router, prefix="/api/recommendations", tags=["Recommendations"])
+app.include_router(users_router, prefix="/api/users", tags=["Users"])
 
 # Basic check/ping route
 @app.get("/health")
