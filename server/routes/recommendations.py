@@ -9,7 +9,7 @@ import server.services.tmdb as tmdb
 router = APIRouter()
 logger = logging.getLogger("cineverse.recommendations_routes")
 
-@router.get("/")
+@router.get("")
 async def get_personalized_recommendations(current_user: dict = Depends(get_current_user)):
     user_id = str(current_user["_id"])
     recommendations = await generate_recommendations_for_user(user_id)

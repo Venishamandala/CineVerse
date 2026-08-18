@@ -8,7 +8,7 @@ from server.config.db import get_db
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 async def get_watchlist(current_user: dict = Depends(get_current_user)):
     db = get_db()
     watchlist_cursor = db.watchlist.find({"userId": current_user["_id"]})
@@ -19,7 +19,7 @@ async def get_watchlist(current_user: dict = Depends(get_current_user)):
         "data": serialize_docs(watchlist_items)
     }
 
-@router.post("/")
+@router.post("")
 async def add_to_watchlist(data: WatchlistAdd, current_user: dict = Depends(get_current_user)):
     db = get_db()
     

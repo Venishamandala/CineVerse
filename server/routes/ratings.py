@@ -7,7 +7,7 @@ from server.config.db import get_db
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 async def get_ratings(current_user: dict = Depends(get_current_user)):
     db = get_db()
     ratings_cursor = db.ratings.find({"userId": current_user["_id"]})
@@ -18,7 +18,7 @@ async def get_ratings(current_user: dict = Depends(get_current_user)):
         "data": serialize_docs(ratings_list)
     }
 
-@router.post("/")
+@router.post("")
 async def submit_rating(data: RatingSubmit, current_user: dict = Depends(get_current_user)):
     db = get_db()
     
