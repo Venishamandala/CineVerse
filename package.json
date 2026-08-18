@@ -2,16 +2,16 @@
   "name": "cineverse-parent",
   "version": "1.0.0",
   "description": "Premium Full-Stack Movie Recommendation Platform",
-  "main": "server/server.js",
+  "main": "server/main.py",
   "scripts": {
-    "start": "node server/server.js",
-    "server": "nodemon server/server.js",
+    "start": "uvicorn server.main:app --host 0.0.0.0 --port 5000",
+    "server": "uvicorn server.main:app --host 127.0.0.1 --port 5000 --reload",
     "client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "install-server": "npm install --production=false --prefix server",
+    "install-server": "pip install -r server/requirements.txt",
     "install-client": "npm install --production=false --prefix client",
-    "install-all": "npm install --production=false && npm run install-server && npm run install-client",
-    "build": "npm run install-all && npm run build --prefix client"
+    "install-all": "npm install --production=false && npm run install-client && npm run install-server",
+    "build": "npm run install-client && npm run build --prefix client"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
