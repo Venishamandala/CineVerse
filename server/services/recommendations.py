@@ -26,7 +26,7 @@ async def generate_recommendations_for_user(user_id: str) -> list:
         ratings_cursor = db.ratings.find({"userId": ObjectId(user_id)})
         ratings = await ratings_cursor.to_list(length=100)
         
-        watchlist_cursor = db.watchlist.find({"userId": ObjectId(user_id)})
+        watchlist_cursor = db.watchlists.find({"userId": ObjectId(user_id)})
         watchlist = await watchlist_cursor.to_list(length=100)
         
         # Extract user profile filters

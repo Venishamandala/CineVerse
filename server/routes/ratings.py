@@ -75,6 +75,18 @@ async def submit_rating(data: RatingSubmit, current_user: dict = Depends(get_cur
         "data": serialize_doc(created_rating)
     }
 
+@router.get("/{movie_id}")
+async def get_movie_rating(movie_id: int, current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    movie_rating = await db.ratings.find_one({
+        "userId": current_user["_id"],
+        "movieId": movie_id
+    })
+    return {
+        "success": True,
+        "rating": movie_rating.get("rating") if movie_rating else None
+    }
+
 @router.delete("/{movie_id}")
 async def delete_rating(movie_id: int, current_user: dict = Depends(get_current_user)):
     db = get_db()

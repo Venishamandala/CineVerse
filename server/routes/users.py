@@ -27,8 +27,8 @@ async def get_user_profile(current_user: dict = Depends(get_current_user)):
     
     # Run counts in parallel
     ratings_count = await db.ratings.count_documents({"userId": user_id})
-    watchlist_count = await db.watchlist.count_documents({"userId": user_id, "watched": False})
-    watched_count = await db.watchlist.count_documents({"userId": user_id, "watched": True})
+    watchlist_count = await db.watchlists.count_documents({"userId": user_id, "watched": False})
+    watched_count = await db.watchlists.count_documents({"userId": user_id, "watched": True})
     
     return {
         "success": True,
