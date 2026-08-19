@@ -97,6 +97,7 @@ const AISuggesterPage = () => {
       if (res.data.success) {
         setMovies(res.data.data || []);
         setAiMessage(res.data.message);
+        setMetrics(res.data.metrics || null);
       }
     } catch (err) {
       console.error('AI Query failed:', err.message);

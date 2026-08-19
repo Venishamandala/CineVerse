@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Optional
 from server.middleware.auth import get_current_user
-from server.services.recommendations import generate_recommendations_for_user
+from server.services.recommendations import generate_recommendations_for_user, get_mood_metrics
 import server.services.tmdb as tmdb
 
 router = APIRouter()
@@ -122,9 +122,13 @@ async def get_mood_recommendations(
         f"Grab your popcorn! 🍿✨"
     )
     
+    user_id = str(current_user["_id"])
+    metrics = await get_mood_metrics(user_id, results[:8])
+
     return {
         "success": True,
         "message": ai_message,
-        "data": results[:8]  # Limit to top 8 items for clean layout grid
+        "data": results[:8],  # Limit to top 8 items for clean layout grid
+        "metrics": metrics
     }
 KeepRecommendationsRouter = router
