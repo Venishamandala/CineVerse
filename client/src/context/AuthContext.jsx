@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed. Please check inputs.';
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'Registration failed. Please check inputs.';
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid email or password.';
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'Invalid email or password.';
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to update preferences.';
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'Failed to update preferences.';
       throw new Error(msg);
     } finally {
       setLoading(false);
