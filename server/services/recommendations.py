@@ -234,9 +234,58 @@ def extract_features(
 
     return genre_features + [lang_match, popularity, vote_avg, in_watchlist, similar_rated, similar_watchlist]
 
+
+def calculate_metrics(X: List[List[float]], y: List[float], dt: DecisionTreeRegressor, rf: RandomForestRegressor) -> dict:
+    """
+    Computes evaluation metrics (Accuracy, Precision, Recall, F1-Score, and Mean Squared Error)
+    for the ensemble models on the training dataset.
+    """
+    if not X or not y:
+        return {"accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1_score": 0.0, "mse": 0.0}
+
+    num_samples = len(X)
+    predictions = []
+    for x in X:
+        dt_pred = dt.predict_one(x)
+        rf_pred = rf.predict_one(x)
+        hybrid_pred = (0.4 * dt_pred) + (0.6 * rf_pred)
+        predictions.append(hybrid_pred)
+
+    # Compute Mean Squared Error (MSE)
+    mse = sum((y[i] - predictions[i]) ** 2 for i in range(num_samples)) / num_samples
+
+    # Compute Classification Metrics at liking threshold 0.6
+    threshold = 0.6
+    tp, tn, fp, fn = 0, 0, 0, 0
+    for i in range(num_samples):
+        true_class = 1 if y[i] >= threshold else 0
+        pred_class = 1 if predictions[i] >= threshold else 0
+
+        if true_class == 1 and pred_class == 1:
+            tp += 1
+        elif true_class == 0 and pred_class == 0:
+            tn += 1
+        elif true_class == 0 and pred_class == 1:
+            fp += 1
+        elif true_class == 1 and pred_class == 0:
+            fn += 1
+
+    accuracy = (tp + tn) / num_samples if num_samples > 0 else 0.0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "accuracy": round(accuracy * 100, 1),
+        "precision": round(precision * 100, 1),
+        "recall": round(recall * 100, 1),
+        "f1_score": round(f1_score * 100, 1),
+        "mse": round(mse, 4)
+    }
+
 # --- MAIN RECOMENDATION ROUTINE ---
 
-async def generate_recommendations_for_user(user_id: str) -> list:
+async def generate_recommendations_for_user(user_id: str) -> tuple:
     try:
         db = get_db()
 
@@ -314,10 +363,11 @@ async def generate_recommendations_for_user(user_id: str) -> list:
         # If candidates pool is empty, return popular fallback
         if not candidates:
             default_data = popular_data.get("results", [])
+            fallback_metrics = {"accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1_score": 0.0, "mse": 0.0}
             return [
                 {**m, "score": 75, "reason": "🍿 Discovering popular choices to kickstart your taste"}
                 for m in default_data if m.get("id") not in watchlist_movie_ids
-            ]
+            ], fallback_metrics
 
         # 3. Compile training dataset (X, y)
         X_train = []
@@ -377,6 +427,9 @@ async def generate_recommendations_for_user(user_id: str) -> list:
         dt.fit(X_train, y_train)
         rf.fit(X_train, y_train)
 
+        # Calculate diagnostics metrics on training set
+        metrics = calculate_metrics(X_train, y_train, dt, rf)
+
         # 5. Score candidates using the ensemble hybrid tree models
         scored_list = []
         for m_id, movie in candidates.items():
@@ -429,9 +482,9 @@ async def generate_recommendations_for_user(user_id: str) -> list:
             return [
                 {**m, "score": 75, "reason": "🍿 Discovering popular choices to kickstart your taste"}
                 for m in default_data if m.get("id") not in watchlist_movie_ids
-            ]
+            ], metrics
 
-        return scored_list[:20]
+        return scored_list[:20], metrics
 
     except Exception as e:
         logger.error(f"🚨 Recommendation generation error: {str(e)}")
