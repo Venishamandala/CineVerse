@@ -1,5 +1,5 @@
 import logging
-import re
+import random
 import math
 from typing import List, Dict, Set, Optional, Any
 from bson import ObjectId
@@ -15,168 +15,275 @@ GENRE_MAP = {
     10770: 'TV Movie', 53: 'Thriller', 10752: 'War', 37: 'Western'
 }
 
-# --- TF-IDF & COSINE SIMILARITY UTILITIES ---
+# Ordered genre keys to maintain feature index consistency
+GENRE_KEYS = [28, 12, 16, 35, 80, 99, 18, 10751, 14, 36, 27, 10402, 9648, 10749, 878, 10770, 53, 10752, 37]
 
-class SimpleTFIDF:
+# --- DECISION TREE & RANDOM FOREST REGRESSOR MODELS ---
+
+class Node:
     """
-    A lightweight, pure-Python TF-IDF vectorizer that cleans text, 
-    removes stopwords, calculates IDFs with smoothing, and transforms text to TF-IDF vectors.
+    Represents a single node in a decision tree.
+    If it is a leaf, it holds a predicted value. Otherwise, it holds splitting thresholds.
     """
-    def __init__(self):
-        self.idf = {}
-        self.vocabulary = set()
-        
-    def _tokenize(self, text: str) -> List[str]:
-        if not text:
-            return []
-        text = text.lower()
-        # Remove non-alphanumeric characters
-        text = re.sub(r'[^a-z0-9\s]', '', text)
-        words = text.split()
-        
-        # Standard English stopwords to filter out noisy terms
-        stopwords = {
-            'the', 'a', 'an', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'to', 'for', 'in', 'on', 'at', 
-            'by', 'of', 'with', 'about', 'as', 'into', 'from', 'this', 'that', 'these', 'those', 'it', 'its', 
-            'they', 'them', 'their', 'who', 'whom', 'which', 'what', 'he', 'him', 'his', 'she', 'her', 'hers', 
-            'you', 'your', 'we', 'us', 'our', 'be', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 
-            'should', 'can', 'could', 'may', 'might', 'must', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 
-            'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 
-            'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 
-            'too', 'very', 's', 't', 'just', 'now'
-        }
-        # Keep words that are longer than 2 characters and not in stopwords
-        return [w for w in words if w not in stopwords and len(w) > 2]
+    def __init__(self, feature=None, threshold=None, left=None, right=None, *, value=None):
+        self.feature = feature       # Index of the feature to split on
+        self.threshold = threshold   # Splitting threshold
+        self.left = left             # Left child branch (<= threshold)
+        self.right = right           # Right child branch (> threshold)
+        self.value = value           # Mean target prediction value (leaf nodes only)
 
-    def fit(self, documents: List[str]):
-        tokenized_docs = [self._tokenize(doc) for doc in documents]
-        num_docs = len(documents)
-        
-        # Count document frequency of each word
-        doc_counts = {}
-        for doc in tokenized_docs:
-            unique_words = set(doc)
-            for word in unique_words:
-                doc_counts[word] = doc_counts.get(word, 0) + 1
-                
-        self.idf = {}
-        self.vocabulary = set(doc_counts.keys())
-        for word, count in doc_counts.items():
-            # Standard smoothed IDF formula
-            self.idf[word] = math.log((1 + num_docs) / (1 + count)) + 1
+    def is_leaf(self) -> bool:
+        return self.value is not None
 
-    def transform(self, text: str) -> Dict[str, float]:
-        tokens = self._tokenize(text)
-        if not tokens:
-            return {}
-        
-        tf = {}
-        for token in tokens:
-            tf[token] = tf.get(token, 0) + 1
+class DecisionTreeRegressor:
+    """
+    A lightweight, pure-Python Decision Tree Regressor using variance reduction.
+    Supports random feature bagging at splits for Random Forest integration.
+    """
+    def __init__(self, max_depth=5, min_samples_split=2, max_features=None):
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.max_features = max_features  # Number of features to consider randomly at each split
+        self.root = None
+
+    def fit(self, X: List[List[float]], y: List[float]):
+        self.root = self._build_tree(X, y, depth=0)
+
+    def _variance(self, y: List[float]) -> float:
+        if not y:
+            return 0.0
+        mean = sum(y) / len(y)
+        return sum((val - mean) ** 2 for val in y) / len(y)
+
+    def _build_tree(self, X: List[List[float]], y: List[float], depth: int) -> Node:
+        num_samples = len(X)
+        if num_samples == 0:
+            return Node(value=0.0)
+
+        num_features = len(X[0])
+
+        # Base case / Stopping criteria
+        if depth >= self.max_depth or num_samples < self.min_samples_split or len(set(y)) == 1:
+            leaf_value = sum(y) / num_samples
+            return Node(value=leaf_value)
+
+        # Randomly select a subset of features to split on (for Random Forest feature bagging)
+        feature_indices = list(range(num_features))
+        if self.max_features is not None:
+            k = min(self.max_features, num_features)
+            feature_indices = random.sample(feature_indices, k)
+
+        # Search for the best feature and split point using Variance Reduction
+        best_feature, best_threshold, best_variance_reduction = None, None, -1.0
+        parent_variance = self._variance(y)
+
+        for feat in feature_indices:
+            feat_values = [sample[feat] for sample in X]
+            thresholds = set(feat_values)
             
-        doc_len = len(tokens)
-        vector = {}
-        for word, freq in tf.items():
-            if word in self.idf:
-                tf_val = freq / doc_len
-                vector[word] = tf_val * self.idf[word]
-                
-        return vector
+            for thresh in thresholds:
+                # Divide y targets based on threshold split
+                left_y = [y[i] for i in range(num_samples) if X[i][feat] <= thresh]
+                right_y = [y[i] for i in range(num_samples) if X[i][feat] > thresh]
 
-def cosine_similarity(vec1: Dict[str, float], vec2: Dict[str, float]) -> float:
-    """
-    Computes cosine similarity between two sparse TF-IDF vectors.
-    Returns a float between 0.0 and 1.0.
-    """
-    if not vec1 or not vec2:
-        return 0.0
-    
-    # Calculate dot product
-    dot_product = 0.0
-    for word, val1 in vec1.items():
-        if word in vec2:
-            dot_product += val1 * vec2[word]
-            
-    # Calculate magnitudes
-    mag1 = math.sqrt(sum(v ** 2 for v in vec1.values()))
-    mag2 = math.sqrt(sum(v ** 2 for v in vec2.values()))
-    
-    if mag1 == 0.0 or mag2 == 0.0:
-        return 0.0
-        
-    return dot_product / (mag1 * mag2)
+                if len(left_y) == 0 or len(right_y) == 0:
+                    continue
 
-def extract_movie_text(movie: dict) -> str:
+                # Variance reduction calculations
+                w_left = len(left_y) / num_samples
+                w_right = len(right_y) / num_samples
+                child_variance = w_left * self._variance(left_y) + w_right * self._variance(right_y)
+                variance_reduction = parent_variance - child_variance
+
+                if variance_reduction > best_variance_reduction:
+                    best_variance_reduction = variance_reduction
+                    best_feature = feat
+                    best_threshold = thresh
+
+        # If no split improves variance, create leaf node
+        if best_variance_reduction <= 0.0 or best_feature is None:
+            leaf_value = sum(y) / num_samples
+            return Node(value=leaf_value)
+
+        # Split samples and recursively build left & right child branches
+        left_idx = [i for i in range(num_samples) if X[i][best_feature] <= best_threshold]
+        right_idx = [i for i in range(num_samples) if X[i][best_feature] > best_threshold]
+
+        X_left = [X[i] for i in left_idx]
+        y_left = [y[i] for i in left_idx]
+        X_right = [X[i] for i in right_idx]
+        y_right = [y[i] for i in right_idx]
+
+        left_child = self._build_tree(X_left, y_left, depth + 1)
+        right_child = self._build_tree(X_right, y_right, depth + 1)
+
+        return Node(feature=best_feature, threshold=best_threshold, left=left_child, right=right_child)
+
+    def predict_one(self, x: List[float]) -> float:
+        node = self.root
+        if not node:
+            return 0.0
+        while not node.is_leaf():
+            if x[node.feature] <= node.threshold:
+                node = node.left
+            else:
+                node = node.right
+        return node.value
+
+    def predict(self, X: List[List[float]]) -> List[float]:
+        return [self.predict_one(x) for x in X]
+
+
+class RandomForestRegressor:
     """
-    Extracts text features from a movie object including title, overview, and genre names.
+    A lightweight, pure-Python Random Forest Regressor.
+    Constructs an ensemble of Decision Trees trained on bootstrapped samples.
     """
-    title = movie.get("title") or movie.get("movieTitle") or movie.get("original_title") or ""
-    overview = movie.get("overview") or ""
+    def __init__(self, n_estimators=10, max_depth=5, min_samples_split=2, max_features=None):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.max_features = max_features
+        self.trees = []
+
+    def fit(self, X: List[List[float]], y: List[float]):
+        self.trees = []
+        num_samples = len(X)
+        if num_samples == 0:
+            return
+
+        for _ in range(self.n_estimators):
+            # Bootstrap sample: sample with replacement
+            indices = [random.randint(0, num_samples - 1) for _ in range(num_samples)]
+            X_sample = [X[idx] for idx in indices]
+            y_sample = [y[idx] for idx in indices]
+
+            # Fit individual trees with feature subset selection
+            tree = DecisionTreeRegressor(
+                max_depth=self.max_depth,
+                min_samples_split=self.min_samples_split,
+                max_features=self.max_features
+            )
+            tree.fit(X_sample, y_sample)
+            self.trees.append(tree)
+
+    def predict_one(self, x: List[float]) -> float:
+        if not self.trees:
+            return 0.0
+        preds = [tree.predict_one(x) for tree in self.trees]
+        return sum(preds) / len(self.trees)
+
+    def predict(self, X: List[List[float]]) -> List[float]:
+        return [self.predict_one(x) for x in X]
+
+# --- METADATA FEATURE EXTRACTION ---
+
+def extract_features(
+    movie: dict,
+    fav_genres: List[int],
+    pref_languages: List[str],
+    watchlist_ids: Set[int],
+    similar_to_rated_map: dict,
+    similar_to_watchlist_set: Set[int]
+) -> List[float]:
+    """
+    Converts a movie's metadata into a 25-dimensional numeric feature vector.
     
-    genre_names = []
-    if "genre_ids" in movie:
-        genre_names = [GENRE_MAP.get(gid, "") for gid in movie["genre_ids"] if gid in GENRE_MAP]
-    elif "genres" in movie:
+    Dimensions:
+    - 0 to 18 (19 dims): Binary indicator of movie genre presence.
+    - 19 (1 dim): Preferred language match (1.0 = match, 0.0 = mismatch).
+    - 20 (1 dim): Normalized popularity metric (scaled [0, 1]).
+    - 21 (1 dim): Normalized vote rating (scaled [0, 1]).
+    - 22 (1 dim): Watchlist inclusion flag (1.0 = yes, 0.0 = no).
+    - 23 (1 dim): Similarity score multiplier matching high-rated user logs.
+    - 24 (1 dim): Similarity flag to user watchlist (1.0 = yes, 0.0 = no).
+    """
+    # 19 binary genre dimensions
+    genre_ids = movie.get("genre_ids", [])
+    if "genres" in movie:
         for g in movie["genres"]:
-            if isinstance(g, dict) and "name" in g:
-                genre_names.append(g["name"])
-            elif isinstance(g, int) and g in GENRE_MAP:
-                genre_names.append(GENRE_MAP[g])
-                
-    genres_str = " ".join([name for name in genre_names if name])
-    return f"{title} {overview} {genres_str}"
+            if isinstance(g, dict) and "id" in g:
+                genre_ids.append(g["id"])
+            elif isinstance(g, int):
+                genre_ids.append(g)
 
-# --- MAIN RECOMMENDATION LOGIC ---
+    genre_features = []
+    for gkey in GENRE_KEYS:
+        genre_features.append(1.0 if gkey in genre_ids else 0.0)
+
+    # 1 language match feature
+    lang_match = 0.0
+    lang = movie.get("original_language", "")
+    if pref_languages and lang in pref_languages:
+        lang_match = 1.0
+
+    # 2 normalized global features
+    popularity = min(movie.get("popularity", 0.0) / 400.0, 1.0)
+    vote_avg = movie.get("vote_average", 0.0) / 10.0
+
+    # 3 interaction features
+    m_id = movie.get("id")
+    in_watchlist = 1.0 if m_id in watchlist_ids else 0.0
+
+    similar_rated = 0.0
+    if m_id in similar_to_rated_map:
+        rating = similar_to_rated_map[m_id].get("rating", 0)
+        similar_rated = rating / 5.0
+
+    similar_watchlist = 1.0 if m_id in similar_to_watchlist_set else 0.0
+
+    return genre_features + [lang_match, popularity, vote_avg, in_watchlist, similar_rated, similar_watchlist]
+
+# --- MAIN RECOMENDATION ROUTINE ---
 
 async def generate_recommendations_for_user(user_id: str) -> list:
     try:
         db = get_db()
-        
-        # 1. Fetch user preferences, ratings, and watchlist
+
+        # 1. Fetch user preferences, ratings, and watchlists
         user = await db.users.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise ValueError("User not found")
-            
+
         preference = await db.userpreferences.find_one({"userId": ObjectId(user_id)})
-        
+
         ratings_cursor = db.ratings.find({"userId": ObjectId(user_id)})
         ratings = await ratings_cursor.to_list(length=100)
-        
+
         watchlist_cursor = db.watchlists.find({"userId": ObjectId(user_id)})
         watchlist = await watchlist_cursor.to_list(length=100)
-        
-        # Extract user profile filters
+
+        # Extract user profile configurations
         fav_genres = preference.get("favoriteGenres", []) if preference else user.get("favoriteGenres", [])
         pref_languages = preference.get("preferredLanguages", ["en"]) if preference else user.get("preferredLanguages", ["en"])
-        
+
         rated_movie_ids = [r["movieId"] for r in ratings]
         watchlist_movie_ids = [w["movieId"] for w in watchlist]
-        
-        # 2. Build candidates pool from TMDB
+
+        # 2. Build candidates pool
         candidates = {} # movieId -> movieDict
         similar_to_rated_map = {} # candidateMovieId -> { title, rating }
         similar_to_watchlist_set = set()
-        
-        # Fetch base lists
+
         popular_data = await tmdb.get_popular_movies({"page": 1})
         top_rated_data = await tmdb.get_top_rated_movies({"page": 1})
         trending_data = await tmdb.get_trending_movies("week", {"page": 1})
-        
+
         def add_candidates(movie_list):
             if movie_list and isinstance(movie_list, list):
                 for movie in movie_list:
                     m_id = movie.get("id")
                     if m_id and m_id not in candidates:
                         candidates[m_id] = movie
-                        
+
         add_candidates(popular_data.get("results", []))
         add_candidates(top_rated_data.get("results", []))
         add_candidates(trending_data.get("results", []))
-        
+
         # Fetch similar movies for user's high rated movies (rating >= 4)
         high_rated_movies = [r for r in ratings if r.get("rating", 0) >= 4]
         high_rated_movies = sorted(high_rated_movies, key=lambda x: x.get("rating", 0), reverse=True)[:3]
-        
+
         for rated_movie in high_rated_movies:
             similar_data = await tmdb.get_similar_movies(rated_movie["movieId"])
             results = similar_data.get("results", [])
@@ -190,7 +297,7 @@ async def generate_recommendations_for_user(user_id: str) -> list:
                             "title": rated_movie["movieTitle"],
                             "rating": rated_movie["rating"]
                         }
-                        
+
         # Fetch similar movies for items in watchlist
         watchlist_sample = watchlist[:3]
         for item in watchlist_sample:
@@ -212,153 +319,120 @@ async def generate_recommendations_for_user(user_id: str) -> list:
                 for m in default_data if m.get("id") not in watchlist_movie_ids
             ]
 
-        # 3. Content Profile Construction & TF-IDF vectorization
-        user_profile_docs = []
-        
-        # Fetch detailed metadata (including overviews) for rated movies to build profile text
-        for rated_movie in high_rated_movies:
+        # 3. Compile training dataset (X, y)
+        X_train = []
+        y_train = []
+
+        # A. Actual rated movie samples
+        for r in ratings:
             try:
-                m_details = await tmdb.get_movie_details(rated_movie["movieId"])
+                m_details = await tmdb.get_movie_details(r["movieId"])
                 if m_details:
-                    user_profile_docs.append(extract_movie_text(m_details))
+                    feats = extract_features(m_details, fav_genres, pref_languages, set(watchlist_movie_ids), similar_to_rated_map, similar_to_watchlist_set)
+                    X_train.append(feats)
+                    y_train.append(r.get("rating", 3.0) / 5.0)  # Normalize rating [0, 1]
             except Exception as e:
-                logger.warning(f"Error fetching rated movie details {rated_movie['movieId']}: {str(e)}")
-                
-        # Fetch detailed metadata for watchlist movies to build profile text
-        for watch_item in watchlist_sample:
+                logger.warning(f"Error fetching training rated movie details: {str(e)}")
+
+        # B. Watchlist movie samples
+        for w in watchlist:
             try:
-                m_details = await tmdb.get_movie_details(watch_item["movieId"])
+                m_details = await tmdb.get_movie_details(w["movieId"])
                 if m_details:
-                    user_profile_docs.append(extract_movie_text(m_details))
+                    feats = extract_features(m_details, fav_genres, pref_languages, set(watchlist_movie_ids), similar_to_rated_map, similar_to_watchlist_set)
+                    X_train.append(feats)
+                    y_train.append(0.8) # High target indicating positive interest
             except Exception as e:
-                logger.warning(f"Error fetching watchlist movie details {watch_item['movieId']}: {str(e)}")
-                
-        # Fallback profile using onboarding choices if no items are rated/watchlisted
-        if not user_profile_docs:
-            onboarding_genre_names = [GENRE_MAP.get(gid, "") for gid in fav_genres if gid in GENRE_MAP]
-            user_profile_docs.append(" ".join(onboarding_genre_names + pref_languages))
+                logger.warning(f"Error fetching training watchlist movie details: {str(e)}")
+
+        # C. Synthetic/Baseline Samples derived from onboarding choices
+        # (Ensures model has enough samples to converge and avoids cold start)
+        synthetic_pool = popular_data.get("results", [])[:15] + top_rated_data.get("results", [])[:15]
+        for movie in synthetic_pool:
+            m_id = movie.get("id")
+            if m_id in rated_movie_ids or m_id in watchlist_movie_ids:
+                continue
+
+            feats = extract_features(movie, fav_genres, pref_languages, set(watchlist_movie_ids), similar_to_rated_map, similar_to_watchlist_set)
             
-        # Compile all candidate documents
-        candidate_docs = []
-        candidate_ids = []
-        for m_id, movie in candidates.items():
-            candidate_docs.append(extract_movie_text(movie))
-            candidate_ids.append(m_id)
-            
-        # Build TF-IDF on complete text corpus (user profile docs + candidate docs)
-        corpus = user_profile_docs + candidate_docs
-        tfidf = SimpleTFIDF()
-        tfidf.fit(corpus)
-        
-        # Construct centroid user profile vector
-        user_vectors = [tfidf.transform(doc) for doc in user_profile_docs]
-        user_profile_vector = {}
-        for vec in user_vectors:
-            for word, val in vec.items():
-                user_profile_vector[word] = user_profile_vector.get(word, 0.0) + val
-                
-        if user_vectors:
-            for word in user_profile_vector:
-                user_profile_vector[word] /= len(user_vectors)
-                
-        # 4. Score candidates using the Hybrid Recommendation algorithm
+            movie_genres = movie.get("genre_ids", [])
+            has_genre_match = any(g in fav_genres for g in movie_genres) if fav_genres else True
+            has_lang_match = movie.get("original_language") in pref_languages if pref_languages else True
+
+            if has_genre_match and has_lang_match:
+                label = 0.8
+            elif has_genre_match or has_lang_match:
+                label = 0.5
+            else:
+                label = 0.2
+
+            X_train.append(feats)
+            y_train.append(label)
+
+        # 4. Train decision tree and random forest regressors
+        # Standard configuration: max_features = sqrt(25) = 5 for Random Forest bagging
+        dt = DecisionTreeRegressor(max_depth=5, min_samples_split=2)
+        rf = RandomForestRegressor(n_estimators=10, max_depth=5, min_samples_split=2, max_features=5)
+
+        dt.fit(X_train, y_train)
+        rf.fit(X_train, y_train)
+
+        # 5. Score candidates using the ensemble hybrid tree models
         scored_list = []
-        
         for m_id, movie in candidates.items():
-            # Skip if user has already rated this movie
             if m_id in rated_movie_ids:
                 continue
-                
-            # --- A. TF-IDF & Cosine Similarity Score (30% weight) ---
-            candidate_vector = tfidf.transform(extract_movie_text(movie))
-            cosine_sim = cosine_similarity(candidate_vector, user_profile_vector)
-            tfidf_score = cosine_sim * 30
+
+            feats = extract_features(movie, fav_genres, pref_languages, set(watchlist_movie_ids), similar_to_rated_map, similar_to_watchlist_set)
             
-            # Identify overlapping terms that contributed most to the similarity score
-            overlapping_terms = []
-            for word, val in candidate_vector.items():
-                if word in user_profile_vector and val > 0 and user_profile_vector[word] > 0:
-                    overlapping_terms.append((word, val * user_profile_vector[word]))
-            overlapping_terms.sort(key=lambda x: x[1], reverse=True)
-            top_terms = [word for word, _ in overlapping_terms[:3]]
+            # Predict from both tree structures
+            dt_pred = dt.predict_one(feats)
+            rf_pred = rf.predict_one(feats)
             
-            # --- B. Genre Preference Score (20% weight) ---
+            # Weighted average combination
+            hybrid_pred = (0.4 * dt_pred) + (0.6 * rf_pred)
+            total_score = round(hybrid_pred * 100)
+            
+            # Bound check
+            total_score = max(min(total_score, 100), 0)
+
+            # Determine dynamic reasoning matching tree nodes
+            matching_genre_names = []
             movie_genres = movie.get("genre_ids", [])
-            genre_score = 0
-            if fav_genres and movie_genres:
-                matching_genres = [g for g in movie_genres if g in fav_genres]
-                genre_score = (len(matching_genres) / len(movie_genres)) * 20
-            else:
-                genre_score = 10
-                
-            # --- C. Language Preference Score (20% weight) ---
-            lang_score = 10
-            if pref_languages and movie.get("original_language") in pref_languages:
-                lang_score = 20
-                
-            # --- D. Previous Ratings Similarity (15% weight) ---
-            ratings_score = 0
-            if m_id in similar_to_rated_map:
-                source = similar_to_rated_map[m_id]
-                if source["rating"] == 5:
-                    ratings_score = 15
-                elif source["rating"] == 4:
-                    ratings_score = 10
-                else:
-                    ratings_score = 5
-                    
-            # --- E. Watchlist Similarity (10% weight) ---
-            watchlist_score = 0
-            if m_id in similar_to_watchlist_set:
-                watchlist_score = 10
-                
-            # --- F. Popularity & Vote Average (10% weight) ---
-            vote_avg = movie.get("vote_average", 0)
-            vote_score = (vote_avg / 10) * 5
-            
-            pop = movie.get("popularity", 0)
-            pop_score = min(pop / 400, 1.0) * 5
-            
-            popularity_score = vote_score + pop_score
-            
-            # Combined Hybrid Score (Max: 30 + 20 + 20 + 15 + 10 + 10 = 100)
-            total_score = round(tfidf_score + genre_score + lang_score + ratings_score + watchlist_score + popularity_score)
-            
-            # 5. Determine personalized explanation reason
-            reason = '✨ Handpicked matching your taste'
+            for g in movie_genres:
+                if g in fav_genres and g in GENRE_MAP:
+                    matching_genre_names.append(GENRE_MAP[g])
+
+            reason = "🌲 Recommended by Random Forest ensemble"
             if m_id in similar_to_rated_map:
                 source = similar_to_rated_map[m_id]
                 reason = f"🎬 Similar to \"{source['title']}\" which you rated {source['rating']}★"
             elif m_id in similar_to_watchlist_set:
                 reason = f"🔖 Similar to a movie in your watchlist"
-            elif tfidf_score > 10 and top_terms:
-                reason = f"🍿 Matches your taste in themes like: {', '.join(top_terms)}"
-            elif genre_score > 10:
-                matches = [GENRE_MAP[gid] for gid in movie_genres if gid in fav_genres and gid in GENRE_MAP]
-                if matches:
-                    reason = f"🍿 Recommended because you like {', '.join(matches[:2])}"
-            elif lang_score > 10 and vote_avg > 7.5:
-                reason = f"🌐 Popular high-rated film in your preferred languages"
-            elif popularity_score > 8:
-                reason = f"🔥 Trending blockbuster loved by many"
-                
+            elif matching_genre_names:
+                reason = f"🌲 Tree Model Match matching your favorite genre: {matching_genre_names[0]}"
+            elif movie.get("original_language") in pref_languages:
+                reason = f"🌐 Language matches your preference profile"
+            elif movie.get("vote_average", 0.0) > 7.5:
+                reason = f"🔥 Highly rated global recommendation"
+
             movie_copy = dict(movie)
             movie_copy["score"] = total_score
             movie_copy["reason"] = reason
             scored_list.append(movie_copy)
-            
-        # Sort by score descending
+
+        # Sort by prediction score descending
         scored_list = sorted(scored_list, key=lambda x: x["score"], reverse=True)
-        
-        # If new user (no scored items), return popular movies
+
         if not scored_list:
             default_data = popular_data.get("results", [])
             return [
                 {**m, "score": 75, "reason": "🍿 Discovering popular choices to kickstart your taste"}
                 for m in default_data if m.get("id") not in watchlist_movie_ids
             ]
-            
+
         return scored_list[:20]
+
     except Exception as e:
         logger.error(f"🚨 Recommendation generation error: {str(e)}")
         raise e
