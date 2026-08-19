@@ -5,7 +5,7 @@
   "main": "server/main.py",
   "scripts": {
     "start": "uvicorn server.main:app --host 0.0.0.0 --port 5000",
-    "server": "uvicorn server.main:app --host 127.0.0.1 --port 5000 --reload",
+    "server": "uvicorn server.main:app --host 0.0.0.0 --port 5000 --reload",
     "client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "install-server": "pip install -r server/requirements.txt",
